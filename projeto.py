@@ -112,9 +112,14 @@ def cliente_scapy():
         msg, identificador = build_msg(tipo_req)
         sock.sendto(msg, (SERVER_IP, SERVER_PORT))
         
-        # Construir o UDP e receber a resposta do servidor
+        # Construir o UDP e o IP
         pacote = UDP(sport=CLIENT_PORT, dport=SERVER_PORT)
         pacote = IP(dst=SERVER_IP) / pacote
+
+        # Calcular o checksum e definir no pacote
+        pacote.chksum = checksum_scapy(pacote)
+
+        # Receber a resposta do servidor
         data = sr1(pacote, timeout=2)
 
         data.show()
@@ -128,6 +133,31 @@ def cliente_scapy():
             print(f'Resposta do servidor: {resposta}')
 
     sock.close()
+
+# Função para calcular o checksum para o SCAPY
+def checksum_scapy(data):
+    # Verificar se o pacote possui as camadas IP e UDP
+    if IP in data and UDP in data:
+        # Construir os dados necessários para o cálculo do checksum
+        pac_udp = bytes(data[UDP]) # Armazena o pacote UDP
+        pac_ip = bytes(data[IP]) # Armazena o pacote IP
+        pseudo_cab = struct.pack('!4s4sBBH', 
+                                    pac_ip[12:16],  # Endereço de origem
+                                    pac_ip[16:20],  # Endereço de destino
+                                    0,              # Preenchido com 0
+                                    17,             # Protocolo UDP (17)
+                                    len(pac_udp))   # Comprimento do UDP
+        
+        checksum_data = pseudo_cab + pac_udp
+        
+        # Realiza o cálculo do checksum
+        if len(checksum_data) % 2 != 0:  # Se o comprimento for ímpar, adiciona um byte nulo
+            checksum_data += b'\x00'
+        
+        checagem = sum(struct.unpack('!%dH' % (len(checksum_data) // 2), checksum_data))
+        checagem = (checagem & 0xFFFF) + (checagem >> 16)  # Adiciona os carry
+        checagem = ~checagem & 0xFFFF  # Inverte os bits para fazer o complemento de 1
+        return checagem
 
 # Main para o usuario escolher entre UPD e SCAPY
 if __name__ == "__main__":
