@@ -9,6 +9,7 @@ import struct
 from scapy.layers.inet import IP, UDP
 from scapy.layers.l2 import Ether
 from scapy.sendrecv import sr1
+from scapy.sendrecv import sniff
 
 # Endereço IP e porta do servidor
 SERVER_IP = '15.228.191.109'
@@ -118,12 +119,13 @@ def cliente_scapy():
         pacote = IP(dst=SERVER_IP) / pacote
 
         # Calcula o checksum e define no pacote
-        pacote.chksum = checksum_scapy(pacote)
+        pacote[UDP].chksum = checksum_scapy(pacote)
+
+        # Limpa os pacotes pendentes no buffer de recebimento para garantir que o cliente vai sempre receber a mensagem com a informação desejada
+        sniff(count=0, timeout=0.1)
 
         # Recebe a resposta do servidor
         data = sr1(pacote, timeout=2) # Envia o pacote e aguarda resposta
-
-        data.show() # Mostra detalhes do pacote recebido
 
         if data:
             req_res, identificador, tamanho_resposta, resposta = proc_resposta_scapy(data)
